@@ -104,7 +104,8 @@ function CoreMusicLibrary (commandRouter) {
 		{name: 'Music Library', uri: 'music-library',plugin_type:'music_service',plugin_name:'mpd'},
         {name: 'Artists', uri: 'artists://',plugin_type:'music_service',plugin_name:'mpd'},
         {name: 'Albums', uri: 'albums://',plugin_type:'music_service',plugin_name:'mpd'},
-        {name: 'Genres', uri: 'genres://',plugin_type:'music_service',plugin_name:'mpd'}
+        {name: 'Genres', uri: 'genres://',plugin_type:'music_service',plugin_name:'mpd'},
+        {name: 'Years', uri: 'years://',plugin_type:'music_service',plugin_name:'mpd'}
 		];
 
 	// Start library promise as rejected, so requestors do not wait for it if not immediately available.
