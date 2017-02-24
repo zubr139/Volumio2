@@ -1744,6 +1744,59 @@ ControllerMpd.prototype.explodeUri = function(uri) {
         }
         else defer.reject(new Error());
     }
+    else if(uri.startsWith('years://albums')) {
+        var splitted = uri.split('/');
+
+        var albumName = nodetools.urlDecode(splitted[4]);
+
+        var cmd = libMpd.cmd;
+        self.clientMpd.sendCommand(cmd("find album \""+albumName+"\"", []), function (err, msg) {
+
+            var list = [];
+            if (msg) {
+                var path;
+                var name;
+                var lines = msg.split('\n');
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i];
+                    if (line.indexOf('file:') === 0) {
+                        var path = line.slice(6);
+                        var name = path.split('/').pop();
+
+                        var artist = self.searchFor(lines, i + 1, 'Artist:');
+                        var album = self.searchFor(lines, i + 1, 'Album:');
+                        var title = self.searchFor(lines, i + 1, 'Title:');
+                        var albumart=self.getAlbumArt({artist: artist, album: album,icon:'fa-dot-circle'}, self.getParentFolder('/mnt/'+path));
+                        var time = parseInt(self.searchFor(lines, i + 1, 'Time:'));
+
+                        if (title) {
+                            title = title;
+                        } else {
+                            title = name;
+                        }
+                        list.push({
+                            uri: 'music-library/'+path,
+                            service: 'mpd',
+                            name: title,
+                            artist: artist,
+                            album: album,
+                            type: 'track',
+                            tracknumber: 0,
+                            albumart: albumart,
+                            duration: time,
+                            trackType: path.split('.').pop()
+                        });
+
+
+                    }
+
+                }
+            }
+            else self.logger.info(err);
+
+            defer.resolve(list);
+        });
+    }
     else if(uri.startsWith('albums://')) {
         //exploding search
         var splitted = uri.split('/');
@@ -2432,7 +2485,7 @@ ControllerMpd.prototype.handleBrowseUri = function (curUri) {
                     }
                     else
                     {
-                        response = self.listAlbumSongs(curUri,4,'years://albums/'+date);
+                        response = self.listAlbumSongs(curUri,4,'years://albums/'+splitted[3]);
                     }
 
                 }
@@ -2444,6 +2497,7 @@ ControllerMpd.prototype.handleBrowseUri = function (curUri) {
                     }
                     else
                     {
+                        response = self.listArtist(curUri,4,'years://artists/'+splitted[3]);
                     }
                 }
                 else
@@ -2565,7 +2619,10 @@ ControllerMpd.prototype.listItemsForYear = function (curUri, index, dateIndex, p
 
                     ]
                 }
-            ]
+            ],
+            "prev": {
+                "uri": previous
+            }
         }
     };
 
@@ -2613,8 +2670,8 @@ ControllerMpd.prototype.listItemsForYear = function (curUri, index, dateIndex, p
 
                     if(date===dateToSearch)
                     {
-                        var item=line.slice(lineStr.length).trim();
-                        yearsList.push(item);
+                        var itemToAdd=line.slice(lineStr.length).trim();
+                        yearsList.push(itemToAdd);
                     }
 
 
@@ -2630,11 +2687,11 @@ ControllerMpd.prototype.listItemsForYear = function (curUri, index, dateIndex, p
             {
                 var val=sortedArray[l];
                 response.navigation.lists[0].items.push({
-                    type: 'radio-category',
+                    type: 'folder',
                     title: val,
                     icon: 'fa fa-folder-open-o',
-                    uri: 'years://'+item+'/'+val
-                    //albumart: self.getAlbumArt({artist:artistName,album:albumName},undefined,'fa-dot-circle-o')
+                    uri: 'years://'+item+'/'+ dateToSearch +'/'+nodetools.urlEncode(val),
+                    albumart: self.getAlbumArt({artist:val,album:val},undefined,'fa-dot-circle-o')
                 });
             }
 
@@ -2665,6 +2722,9 @@ ControllerMpd.prototype.listYearsForItem = function (curUri, index, previous) {
                     ]
                 }
             ]
+        },
+        "prev": {
+            "uri": "years://"
         }
     };
 
@@ -2829,6 +2889,7 @@ ControllerMpd.prototype.listAlbumSongs = function (uri,index,previous) {
 
     var cmd = libMpd.cmd;
     self.clientMpd.sendCommand(cmd("find album \""+albumName+"\"", []), function (err, msg) {
+
         if (msg) {
             var path;
             var name;
@@ -3036,7 +3097,7 @@ ControllerMpd.prototype.listArtist = function (curUri,index,previous,uriBegin) {
                                 self.parseListAlbum(err, msg, defer, response, uriBegin);
                             }
 
-
+                            break;
                         }
                         ;
                     }
