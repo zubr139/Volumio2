@@ -2737,11 +2737,12 @@ ControllerMpd.prototype.listItemsForYear = function (curUri, index, dateIndex, p
     }
     else if(item=='songs')
     {
-        itemnos='track';
-        lineStr="Track:";
+        itemnos='title';
+        lineStr="Title:";
     }
 
     var yearsList=[];
+    var promises=[];
 
     var cmd = libMpd.cmd;
     self.clientMpd.sendCommand(cmd("list", [itemnos,"group","date"]), function (err, msg) {
@@ -2776,23 +2777,129 @@ ControllerMpd.prototype.listItemsForYear = function (curUri, index, dateIndex, p
             for(var l in sortedArray)
             {
                 var val=sortedArray[l];
-                response.navigation.lists[0].items.push({
-                    type: 'folder',
-                    title: val,
-                    icon: 'fa fa-folder-open-o',
-                    uri: 'years://'+item+'/'+ dateToSearch +'/'+nodetools.urlEncode(val),
-                    albumart: self.getAlbumArt({artist:val,album:val},undefined,'fa-dot-circle-o')
-                });
+
+                if(item=='songs')
+                {
+
+                    promises.push(self.listSongsForYear(val));
+                }
+                else
+                {
+                    promises.push(libQ.resolve({
+                        type: 'folder',
+                        title: val,
+                        icon: 'fa fa-folder-open-o',
+                        uri: 'years://'+item+'/'+ dateToSearch +'/'+nodetools.urlEncode(val),
+                        albumart: self.getAlbumArt({artist:val,album:val},undefined,'fa-dot-circle-o')
+                    }));
+                }
+
             }
 
+            libQ.all(promises)
+                .then(function(val)
+                {
+                    for(var k in val)
+                    {
+                        var vall=val[k];
+                        if( vall instanceof Array)
+                        {
+                            for(var l in vall)
+                            {
+                                var itt=vall[l];
+                                response.navigation.lists[0].items.push(itt);
+                            }
 
+                        }
+                        else
+                        {
+                            response.navigation.lists[0].items.push(val[k]);
+                        }
 
-            defer.resolve(response);
+                    }
+
+                    defer.resolve(response);
+                })
+                .fail(function(val)
+                {
+
+                    defer.reject(new Error(val));
+                })
+            ;
+
         }
     });
     return defer.promise;
 
 };
+
+ControllerMpd.prototype.listSongsForYear = function (val) {
+    var self=this;
+
+    var songDefer=libQ.defer();
+
+    var cmd = libMpd.cmd;
+    self.clientMpd.sendCommand(cmd("find title \""+val+"\"", []), function (err, msg) {
+
+        if (msg) {
+            console.log(msg);
+
+            var path;
+            var name;
+            var lines = msg.split('\n');
+
+            var resp=[];
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+                if (line.indexOf('file:') === 0) {
+                    var path = line.slice(6);
+                    var name = path.split('/').pop();
+
+                    var artist = self.searchFor(lines, i + 1, 'Artist:');
+                    var album = self.searchFor(lines, i + 1, 'Album:');
+                    var title = self.searchFor(lines, i + 1, 'Title:');
+                    var track = self.searchFor(lines, i + 1, 'Track:');
+                    var albumart=self.getAlbumArt({artist: artist, album: album}, self.getParentFolder(path),'fa-dot-circle');
+                    var time = parseInt(self.searchFor(lines, i + 1, 'Time:'));
+
+                    if (title) {
+                        title = title;
+                    } else {
+                        title = name;
+                    }
+                    resp.push({
+                        uri: 'music-library/'+path,
+                        service: 'mpd',
+                        title: title,
+                        artist: artist,
+                        album: album,
+                        type: 'song',
+                        tracknumber: track,
+                        albumart: albumart,
+                        duration: time,
+                        trackType: path.split('.').pop()
+                    });
+
+
+                }
+
+            }
+
+            console.log(resp);
+            songDefer.resolve(resp);
+        }
+        else
+        {
+            self.logger.info(err);
+            songDefer.reject(new Error(err));
+        }
+    });
+
+    return songDefer.promise;
+}
+
+
+
 
 ControllerMpd.prototype.listYearsForItem = function (curUri, index, previous) {
     var self = this;
