@@ -1851,6 +1851,26 @@ ControllerMpd.prototype.explodeUri = function(uri) {
             defer.resolve(list);
         });
     }
+    else if(uri.startsWith('years://artists')) {
+        /*
+         years://artists/year/artist in service mpd
+         */
+        var splitted = uri.split('/');
+
+        var artist = nodetools.urlDecode(splitted[4]);
+
+        var cmd = libMpd.cmd;
+
+        self.clientMpd.sendCommand(cmd("find artist \""+artist+"\"", []), function (err, msg) {
+            if(msg=='')
+            {
+                self.clientMpd.sendCommand(cmd("find albumartist \""+artist+"\"", []), function (err, msg) {
+                    self.exploderArtistByDate(err,msg,defer,splitted[3]);
+                });
+            }
+            else self.exploderArtistByDate(err,msg,defer,splitted[3]);
+        });
+    }
     else if(uri.startsWith('artists://')) {
         /*
          artists://AC%2FDC/Rock%20or%20Bust in service mpd
@@ -2033,6 +2053,76 @@ ControllerMpd.prototype.explodeUri = function(uri) {
 
     return defer.promise;
 };
+
+
+ControllerMpd.prototype.exploderArtistByDate=function(err,msg,defer,year)
+{
+    var self=this;
+
+    var list = [];
+    var albums=[],albumarts=[];
+
+    var yearAsDate=moment(year);
+
+    if (msg) {
+        var path;
+        var name;
+        var lines = msg.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            if (line.indexOf('file:') === 0) {
+                var path = line.slice(6);
+                var name = path.split('/').pop();
+
+                var artist = self.searchFor(lines, i + 1, 'Artist:');
+                var album = self.searchFor(lines, i + 1, 'Album:');
+                var title = self.searchFor(lines, i + 1, 'Title:');
+                var itemYear= moment(self.searchFor(lines, i+1, 'Date:'));
+
+                if(yearAsDate.isSame(itemYear))
+                {
+                    var albumart=self.getAlbumArt({artist: artist, album: album}, self.getParentFolder('/mnt/'+path));
+                    var time = parseInt(self.searchFor(lines, i + 1, 'Time:'));
+
+                    if (title) {
+                        title = title;
+                    } else {
+                        title = name;
+                    }
+                    list.push({
+                        uri: 'music-library/'+path,
+                        service: 'mpd',
+                        name: title,
+                        artist: artist,
+                        album: album,
+                        type: 'track',
+                        tracknumber: 0,
+                        albumart: albumart,
+                        duration: time,
+                        trackType: path.split('.').pop()
+                    });
+                }
+
+
+            }
+
+        }
+
+
+        defer.resolve(list);
+
+
+    }
+    else
+    {
+        self.logger.info(err);
+        defer.reject(new Error());
+    }
+}
+
+
+
+
 
 ControllerMpd.prototype.exploderArtist=function(err,msg,defer)
 {
@@ -2497,7 +2587,7 @@ ControllerMpd.prototype.handleBrowseUri = function (curUri) {
                     }
                     else
                     {
-                        response = self.listArtist(curUri,4,'years://artists/'+splitted[3]);
+                        response = self.listArtistByYear(curUri,4,'years://artists/'+splitted[3],undefined,splitted[3]);
                     }
                 }
                 else
@@ -3109,6 +3199,123 @@ ControllerMpd.prototype.listArtist = function (curUri,index,previous,uriBegin) {
 
 };
 
+ControllerMpd.prototype.listArtistByYear = function (curUri,index,previous,uriBegin,year) {
+    var self = this;
+
+    var defer = libQ.defer();
+
+    var splitted=curUri.split('/');
+
+    var response = {
+        "navigation": {
+            "lists": [{
+                "title": self.commandRouter.getI18nString('COMMON.ALBUMS'),
+                "icon": "fa icon",
+                "availableListViews": [
+                    "list",
+                    "grid"
+                ],
+                "items": [
+
+                ]
+            },
+                {
+                    "title": self.commandRouter.getI18nString('COMMON.TRACKS'),
+                    "icon": "fa icon",
+                    "availableListViews": [
+                        "list"
+                    ],
+                    "items": [
+
+                    ]
+                }],
+            "prev": {
+                "uri": previous
+            }
+        }
+    };
+
+    var yearMoment=moment(year);
+
+    self.mpdReady
+        .then(function() {
+            var artist = nodetools.urlDecode(splitted[index]);
+
+
+            var cmd = libMpd.cmd;
+
+            self.clientMpd.sendCommand(cmd("find artist \"" + artist + "\"", []), function (err, msg) {
+                var list = [];
+                var albums = [], albumarts = [];
+                if (msg) {
+                    var path;
+                    var name;
+                    var lines = msg.split('\n');
+                    for (var i = 0; i < lines.length; i++) {
+                        var line = lines[i];
+                        if (line.indexOf('file:') === 0) {
+                            var path = line.slice(6);
+                            var name = path.split('/').pop();
+
+                            var artist = self.searchFor(lines, i + 1, 'Artist:');
+                            var album = self.searchFor(lines, i + 1, 'Album:');
+                            var title = self.searchFor(lines, i + 1, 'Title:');
+                            var track = self.searchFor(lines, i + 1, 'Track:');
+                            var itemYear = moment(self.searchFor(lines, i + 1, 'Date:'));
+
+                            if(yearMoment.isSame(itemYear))
+                            {
+                                console.log(itemYear.format("YYYY")+"      "+yearMoment.format("YYYY"));
+
+                                var albumart = self.getAlbumArt({
+                                    artist: artist,
+                                    album: album
+                                }, self.getParentFolder(path), 'fa-dot-circle-o');
+
+                                if (title) {
+                                    title = title;
+                                } else {
+                                    title = name;
+                                }
+                                response.navigation.lists[1].items.push({
+                                    service: 'mpd',
+                                    type: 'song',
+                                    title: title,
+                                    artist: artist,
+                                    album: album,
+                                    tracknumber: track,
+                                    albumart: albumart,
+                                    uri: path
+                                });
+
+
+
+                            }
+
+                        }
+                    }
+
+
+                    if (msg == '') {
+                        self.clientMpd.sendCommand(cmd("find albumartist \"" + artist + "\"", []), function (err, msg) {
+                            self.parseListAlbumByYear(err, msg, defer, response, uriBegin,year);
+                        });
+                    }
+                    else {
+                        self.parseListAlbumByYear(err, msg, defer, response, uriBegin,year);
+                    }
+
+
+                    defer.resolve(response);
+
+                }
+
+            });
+        });
+    return defer.promise;
+
+};
+
 
 ControllerMpd.prototype.parseListAlbum= function(err,msg,defer,response,uriBegin)
 {
@@ -3181,6 +3388,87 @@ ControllerMpd.prototype.parseListAlbum= function(err,msg,defer,response,uriBegin
     {
         self.logger.info(err);
         defer.reject(new Error());
+    }
+}
+
+
+ControllerMpd.prototype.parseListAlbumByYear= function(err,msg,defer,response,uriBegin,year)
+{
+    var self=this;
+    var list = [];
+    var albums=[],albumarts=[];
+
+    var yearMoment=moment(year);
+
+    if (msg) {
+
+
+        var path;
+        var name;
+        var lines = msg.split('\n');
+
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            if (line.indexOf('file:') === 0) {
+                var path = line.slice(6);
+                var name = path.split('/').pop();
+
+                var artist = self.searchFor(lines, i + 1, 'Artist:');
+                var album = self.searchFor(lines, i + 1, 'Album:');
+                var title = self.searchFor(lines, i + 1, 'Title:');
+                var itemYear = moment(self.searchFor(lines, i + 1, 'Date:'));
+
+                if(yearMoment.isSame(itemYear))
+                {
+                    var albumart=self.getAlbumArt({artist: artist, album: album}, self.getParentFolder(path),'fa-dot-circle-o');
+
+                    if (title) {
+                        title = title;
+                    } else {
+                        title = name;
+                    }
+                    /*response.navigation.lists[1].items.push({
+                        service: 'mpd',
+                        type: 'song',
+                        title: title,
+                        artist: artist,
+                        album: album,
+                        albumart: albumart,
+                        uri: path
+                    });*/
+
+                   if(albums.indexOf(album)===-1)
+                    {
+                        albums.push(album);
+                        albumarts.push();
+
+                        var uri;
+
+                        if(uriBegin===undefined)
+                            uri='artists://' + nodetools.urlEncode(artist) +'/'+nodetools.urlEncode(album);
+                        else uri=uriBegin+'/'+nodetools.urlEncode(album);
+
+                        response.navigation.lists[0].items.push(
+                            {
+                                service:'mpd',
+                                type: 'folder',
+                                title: album,
+                                albumart: self.getAlbumArt({artist: artist, album: album}, self.getParentFolder(path),'fa-dot-circle-o'),
+                                uri: uri
+                            });
+                    }
+                }
+
+
+            }
+
+        }
+
+    }
+    else
+    {
+        self.logger.info(err);
+//        defer.reject(new Error());
     }
 }
 
