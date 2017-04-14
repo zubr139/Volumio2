@@ -362,9 +362,33 @@ PluginManager.prototype.onVolumioStart = function () {
 
 	self.plugins.forEach(function (value, key) {
 		var plugin = value.instance;
-
+		
 		if (plugin.onVolumioStart != undefined)
 			plugin.onVolumioStart();
+	});
+};
+
+PluginManager.prototype.onVolumioShutdown = function () {
+	var self = this;
+
+	self.plugins.forEach(function (value, key) {
+		if (self.isEnabled(value.category, value.name)) {
+			var plugin = value.instance;
+			if (plugin.onVolumioShutdown != undefined)
+				plugin.onVolumioShutdown();
+		}
+	});
+};
+
+PluginManager.prototype.onVolumioReboot = function () {
+	var self = this;
+
+	self.plugins.forEach(function (value, key) {
+		if (self.isEnabled(value.category, value.name)) {
+			var plugin = value.instance;
+			if (plugin.onVolumioReboot != undefined)
+				plugin.onVolumioReboot();
+		}
 	});
 };
 
@@ -422,7 +446,7 @@ PluginManager.prototype.installPlugin = function (url) {
 	self.pushMessage('installPluginStatus',{'progress': 10, 'message': 'Downloading plugin','title' : modaltitle, 'advancedLog': advancedlog});
 
 
-	exec("/usr/bin/wget -O /tmp/downloaded_plugin.zip "+url, function (error, stdout, stderr) {
+	exec("/usr/bin/wget -O /tmp/downloaded_plugin.zip '" + url + "'", function (error, stdout, stderr) {
 
 		if (error !== null) {
 			currentMessage = "Cannot download file "+url+ ' - ' + error;
@@ -551,7 +575,7 @@ PluginManager.prototype.updatePlugin = function (data) {
 	self.pushMessage('installPluginStatus',{'progress': 10, 'message': 'Downloading Update','title' : modaltitle, 'advancedLog': advancedlog});
 
 
-	exec("/usr/bin/wget -O /tmp/downloaded_plugin.zip "+url, function (error, stdout, stderr) {
+	exec("/usr/bin/wget -O /tmp/downloaded_plugin.zip '" + url + "'", function (error, stdout, stderr) {
 
 		if (error !== null) {
 			currentMessage = "Cannot download file "+url+ ' - ' + error;
@@ -679,7 +703,7 @@ PluginManager.prototype.rmDir = function (folder) {
 
 	var defer=libQ.defer();
 	fs.remove('/tmp/downloaded_plugin', function (err) {
-		if (err) defere.reject(new Error("Cannot delete folder "+folder));
+		if (err) defer.reject(new Error("Cannot delete folder "+folder));
 
 		self.logger.info("Folder "+folder+" removed");
 		defer.resolve(folder);
@@ -1015,7 +1039,7 @@ PluginManager.prototype.modifyPluginStatus = function (category,name,status) {
 	var isEnabled=self.config.get(key+'.enabled');
 
 	if(isEnabled==false)
-		defere.reject(new Error());
+		defer.reject(new Error());
 	else
 	{
 		self.logger.info("Changing plugin "+name+" status to "+status);
