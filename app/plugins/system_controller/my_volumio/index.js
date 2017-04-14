@@ -147,24 +147,31 @@ myVolumioController.prototype.connectToCloud = function () {
 
     var conf = {
         url: 'wss://dev-my.volumio.org/',
-            name: name,
-            type: wipeer.client.type.NODEJS,
-            credentials: {
-            username: 'account1',
-            password: 'password1'
-        }
+        name: name,
+        type: wipeer.client.type.NODEJS
+    }
+    var credentials = {
+        username: 'account1',
+        password: 'password1'
     }
 
-    return new Promise((resolve) => {
+    return new Promise(function(resolve) {
+        var tasks = 0
+        var done = function() {
+            if(++tasks === 2)
+                resolve()
+        }
+
         self.logger.info('Establishing MyVolumio Cloud Connection')
-        this.backend = new myvolumio.Backend(conf)
-        this.backend.events.on('started', resolve)
-        this.backend.start()
-        this.backend.events.on('linked', resolve)
-        this.backend.link('http://localhost:3000')
-})
+        self.backend = new myvolumio.Backend(conf)
+        self.backend.on('cloud:connect', done)
+        self.backend.io.on('connect', done)
+        self.backend.connect(credentials)
+        self.backend.io.connect('http://localhost:3000')
+    })
 
 };
+
 
 myVolumioController.prototype.cloudLink = function () {
     var self = this;
