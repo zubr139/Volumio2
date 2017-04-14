@@ -209,7 +209,7 @@ myVolumioController.prototype.startCloud = function () {
 
 
                     } else {
-                       hotsts = {host: hostsarray[0]}
+                        hosts = {host: hostsarray[0]}
                         return self.cloudLink()
                     }
 
