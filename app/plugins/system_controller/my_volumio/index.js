@@ -5,6 +5,8 @@ var fs = require('fs-extra');
 var Promise = require('bluebird');
 var wipeer = require('wipeer');
 var myvolumio = require('myvolumio');
+var ifconfig = require('wireless-tools/ifconfig');
+var hosts = {};
 
 module.exports = myVolumioController;
 
@@ -25,6 +27,8 @@ myVolumioController.prototype.onVolumioStart = function ()
         'config.json');
     self.config = new (require('v-conf'))();
     self.config.loadFile(configFile);
+
+
 };
 
 
@@ -45,7 +49,7 @@ myVolumioController.prototype.onStart = function ()
 
     };
 
-    self.cloudLink();
+    self.startCloud();
 
     return defer.promise;
 }
@@ -140,10 +144,12 @@ myVolumioController.prototype.setAdditionalConf = function () {
 
 myVolumioController.prototype.connectToCloud = function () {
     var self = this;
+    var defer = libQ.defer();
 
     var name = self.commandRouter.executeOnPlugin('system_controller', 'system', 'getConfigParam', 'playerName');
     var username = self.config.get('username');
     var password = self.config.get('password');
+
 
     var conf = {
         url: 'wss://dev-my.volumio.org/',
@@ -162,8 +168,10 @@ myVolumioController.prototype.connectToCloud = function () {
                 resolve()
         }
 
+
         self.logger.info('Establishing MyVolumio Cloud Connection')
         self.backend = new myvolumio.Backend(conf)
+        self.backend.setLocations(hosts)
         self.backend.on('cloud:connect', done)
         self.backend.io.on('connect', done)
         self.backend.connect(credentials)
@@ -179,4 +187,35 @@ myVolumioController.prototype.cloudLink = function () {
             .catch((e) => {
             self.logger.error('Volumio Cloud Backend error: '+ e)
 })
+}
+
+myVolumioController.prototype.startCloud = function () {
+    var self = this;
+
+    var hostsarray = [];
+    var interfacesarray = ['eth0','wlan0'];
+    var defer = libQ.defer();
+
+        for (var i in interfacesarray) {
+            ifconfig.status(interfacesarray[i], function (err, status) {
+                if (status != undefined && status.ipv4_address != undefined) {
+                    hostsarray.push('http://' + status.ipv4_address);
+                }
+
+                if (i === interfacesarray.length) {
+                    if (hostsarray.length > 1) {
+                        hosts = {host: hostsarray[0], host2: hostsarray[1]}
+                        return self.cloudLink()
+
+
+                    } else {
+                       hotsts = {host: hostsarray[0]}
+                        return self.cloudLink()
+                    }
+
+                }
+                i++
+            });
+        }
+
 }
