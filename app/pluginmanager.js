@@ -1556,8 +1556,7 @@ PluginManager.prototype.checkIndex = function () {
 	var defer=libQ.defer();
 
 	coreConf.loadFile(__dirname+'/plugins/plugins.json');
-
-	// checking that all key exist
+	
 	var categories=coreConf.getKeys();
 	for(var i in categories)
 	{
@@ -1571,9 +1570,15 @@ PluginManager.prototype.checkIndex = function () {
 
 			if(self.config.has(key)===false)
 			{
-				self.logger.info("Found new core plugin "+category+"/"+plugin+". Adding it");
 
-				self.config.addConfigValue(key+'.enabled','boolean',true);
+				self.logger.info("Found new core plugin "+category+"/"+plugin+". Adding it");
+				try {
+                    var enabled = coreConf.data[category][plugin].enabled.value;
+				} catch(e) {
+                    var enabled = true;
+				}
+
+				self.config.addConfigValue(key+'.enabled','boolean', enabled);
 				self.config.addConfigValue(key+'.status','string','STOPPED');
 
 			}
