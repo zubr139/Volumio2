@@ -162,14 +162,15 @@ volumioAppearance.prototype.getUiSettings = function()
     var theme = config.get('theme');
     var background_type = config.get('background_type');
     var metatitle = config.get('metatitle', 'Volumio - Audiophile Music Player');
+    var gaEnable = config.get('analyticsEnabled', true);
 
     if (background_type === 'background') {
         var background_title = config.get('background_title');
         var background_path = config.get('background_path');
-        var UiSettings = {"background":{"title":background_title, "path":background_path},"language":language, "theme":theme, "pageTitle":metatitle}
+        var UiSettings = {"background":{"title":background_title, "path":background_path},"language":language, "theme":theme, "pageTitle":metatitle, "analyticsEnabled": gaEnable}
     } else {
         var background_color = config.get('background_color');
-        var UiSettings = {"color":background_color, "language":language, "theme":theme, "pageTitle":metatitle}
+        var UiSettings = {"color":background_color, "language":language, "theme":theme, "pageTitle":metatitle, "analyticsEnabled": gaEnable}
     }
 
     defer.resolve(UiSettings);
@@ -418,4 +419,11 @@ volumioAppearance.prototype.getAvailableLanguages = function() {
 volumioAppearance.prototype.getConfigParam = function (key) {
     var self = this;
     return config.get(key);
+};
+
+
+volumioAppearance.prototype.setAnalyticsEnabled = function (data) {
+    var self = this;
+
+    config.set('analyticsEnabled', data.analyticsEnabled);
 };

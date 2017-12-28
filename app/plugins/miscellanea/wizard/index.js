@@ -339,3 +339,26 @@ volumioWizard.prototype.getDoneMessage = function () {
     }
     return response;
 };
+
+volumioWizard.prototype.getAnalytics = function () {
+    var self = this;
+    var variant = 'none';
+    var analyticsMessage = self.commandRouter.getI18nString('WIZARD.ALLOW_ANALYTICS');
+    var response = {show : false, value : true, message: analyticsMessage}
+    try {
+        var file = fs.readFileSync('/etc/os-release').toString().split('\n');
+        for (var l in file) {
+            if (file[l].match(/VOLUMIO_VARIANT/i)) {
+                var str = file[l].split('=');
+                variant = str[1].replace(/\"/gi, "");
+            }
+        }
+
+    } catch (e) {
+
+    }
+
+    if (variant === 'volumio') {
+
+    }
+};

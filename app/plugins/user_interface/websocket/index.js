@@ -1745,7 +1745,8 @@ function InterfaceWebUI(context) {
 				var donation = self.commandRouter.executeOnPlugin('miscellanea', 'wizard', 'getDonation', '');
 				var contributionsarray =  self.commandRouter.executeOnPlugin('miscellanea', 'wizard', 'getDonationsArray', '');
 				var lastStepMessage = self.commandRouter.executeOnPlugin('miscellanea', 'wizard', 'getDoneMessage', '');
-				var laststep = {"congratulations":lastStepMessage.congratulations, "title":lastStepMessage.title,"message":lastStepMessage.message,"donation":donation, "donationAmount": contributionsarray};
+                var analytics = self.commandRouter.executeOnPlugin('miscellanea', 'wizard', 'getAnalytics', '');
+				var laststep = {"congratulations":lastStepMessage.congratulations, "title":lastStepMessage.title,"message":lastStepMessage.message,"donation":donation, "donationAmount": contributionsarray, "analytics": analytics};
 
 				selfConnWebSocket.emit('pushDonePage', laststep);
 			});
