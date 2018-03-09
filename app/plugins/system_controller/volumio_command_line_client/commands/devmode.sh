@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NODEMON_DIR=/volumio/node_modules/nodemon/
-ETH_IP=`/usr/bin/sudo /sbin/ifconfig eth0 | grep "inet addr" | cut -d ':' -f 2 | cut -d ' ' -f 1`
+ETH_IP=`ip addr show eth0 | grep "inet" | awk '{print $2}' | awk -F "/" '{print $1}' | sed '2d' | tr -d '\n'`
 PORT=9229
 
 echo "Stopping Volumio service"

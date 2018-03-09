@@ -9,7 +9,6 @@ var io=require('socket.io-client');
 var exec = require('child_process').exec;
 var libQ = require('kew');
 var ip = require('ip');
-var ifconfig = require('wireless-tools/ifconfig');
 
 // Define the ControllerVolumioDiscovery class
 
@@ -376,13 +375,14 @@ ControllerVolumioDiscovery.prototype.getDevices=function()
 		{
 			var address=addresses[j];
 			if (isSelf){
+                var wlanip = self.commandRouter.executeOnPlugin('system_controller', 'network', 'getIPV4Address', 'wlan0');
+				if (wlanip != undefined) {
+                    address = wlanip;
+				} else {
+                    address = ip.address();
+				}
+                address = ip.address();
 
-				ifconfig.status('wlan0', function(err, status) {
-					if (status != undefined) {
-						if (status.ipv4_address != undefined) {
-							address = status.ipv4_address;
-						} else address = ip.address();
-					} }); address = ip.address();
 			} else {
 				if ( address.value[0] != undefined && address.value[0].value[0] != undefined){
 					address = address.value[0].value[0];

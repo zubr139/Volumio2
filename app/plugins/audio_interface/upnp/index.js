@@ -3,7 +3,6 @@
 var fs = require('fs-extra');
 var exec = require('child_process').exec;
 var os = require('os');
-var ifconfig = require('wireless-tools/ifconfig');
 var ip = require('ip');
 var libQ = require('kew');
 var net = require('net');
@@ -97,17 +96,18 @@ UpnpInterface.prototype.getCurrentIP = function () {
     var defer = libQ.defer();
     var ipaddr = '';
 
-    ifconfig.status('wlan0', function(err, status) {
-        if (status != undefined) {
-            if (status.ipv4_address != undefined) {
-                ipaddr = status.ipv4_address;
-                defer.resolve(ipaddr);
-            } else {
-                ipaddr = ip.address();
-                defer.resolve(ipaddr);
-            }
+    var wlanip = self.commandRouter.executeOnPlugin('system_controller', 'network', 'getIPV4Address', 'wlan0');
+    if (wlanip != undefined) {
+        ipaddr = wlanip;
+        defer.resolve(ipaddr);
+    } else {
+        var ethip = self.commandRouter.executeOnPlugin('system_controller', 'network', 'getIPV4Address', 'eth0');
+        if (ethip != undefined) {
+            ipaddr = ethip;
+            defer.resolve(ipaddr);
         }
-    });
+    }
+
     return defer.promise;
 };
 

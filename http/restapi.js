@@ -3,7 +3,7 @@ var app = require('./index.js')
 var bodyParser = require('body-parser');
 var ip = require('ip');
 var api = express.Router();
-var ifconfig = require('wireless-tools/ifconfig');
+var execSync = require('child_process').execSync;
 var primaryhost = undefined;
 
 function apiInterface(server, commandRouter) {
@@ -48,23 +48,16 @@ api.get('/host', function(req, res) {
 		return res.json({ host: primaryhost});
 	} else {
 		for (var i in interfacesarray) {
-			ifconfig.status(interfacesarray[i], function (err, status) {
-
-				if (status != undefined && status.ipv4_address != undefined) {
-					hostsarray.push('http://' + status.ipv4_address);
-				}
-
-				if (i === interfacesarray.length) {
-					if (hostsarray.length > 1) {
-						return res.json({host: hostsarray[0], host2: hostsarray[1]});
-					} else {
-						return res.json({host: hostsarray[0]});
-					}
-
-				}
-				i++
-			});
+            var ifaceip = execSync("ip addr show " + interfacesarray[i] + " | grep \"inet\" | awk '{print $2}' | awk -F \"/\" '{print $1}' | sed '2d' | tr -d '\n'", { encoding: 'utf8' });
+            if (ifaceip != undefined) {
+                hostsarray.push('http://' + ifaceip);
+			}
 		}
+        if (hostsarray.length > 1) {
+            return res.json({host: hostsarray[0], host2: hostsarray[1]});
+        } else {
+            return res.json({host: hostsarray[0]});
+        }
 	}
 });
 
@@ -77,7 +70,5 @@ api.post('/host', function(req, res) {
 	}
 
 });
-
-
 
 module.exports = api;
