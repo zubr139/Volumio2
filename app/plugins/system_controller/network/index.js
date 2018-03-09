@@ -5,7 +5,6 @@ var fs = require('fs-extra');
 var exec = require('child_process').exec;
 var execSync = require('child_process').execSync;
 var iwlist = require('./lib/iwlist.js');
-var ifconfig = require('./lib/ifconfig.js');
 var config = new (require('v-conf'))();
 var ip = require('ip');
 var isOnline = require('is-online');
@@ -851,42 +850,31 @@ ControllerNetwork.prototype.getInfoNetwork = function () {
     var ethdefer = libQ.defer();
 	defers.push(ethdefer)
 
-	ifconfig.status('eth0', function (err, status) {
-		if (status != undefined) {
-			if (status.ipv4_address != undefined) {
-				ethip = status.ipv4_address
-				var ethstatus = {type: "Wired", ip: ethip, status: "connected", speed: ethspeed, online: oll};
-				response.push(ethstatus);
-				ethdefer.resolve()
-			} else {
-                ethdefer.resolve()
-			}
-		} else {
-            ethdefer.resolve()
-		}
-	});
+    var ethip = self.getIPV4Address('eth0');
+	if (ethip != undefined) {
+        var ethstatus = {type: "Wired", ip: ethip, status: "connected", speed: ethspeed, online: oll};
+        response.push(ethstatus);
+        ethdefer.resolve();
+	} else {
+        ethdefer.resolve();
+	}
 
     var wlandefer = libQ.defer();
-    defers.push(wlandefer)
-	ifconfig.status('wlan0', function (err, status) {
-		if (status != undefined) {
-			if (status.ipv4_address != undefined) {
-				if (status.ipv4_address == '192.168.211.1') {
-					var wlanstatus = {type: "Wireless", ssid: 'Hotspot', signal: 5, ip:'192.168.211.1', online: oll}
-				} else {
-					wlanip = status.ipv4_address;
-					var wlanstatus = {type: "Wireless", ssid: ssid, signal: wirelessquality,ip: wlanip, status: "connected", speed: wirelessspeed, online: oll}
-				}
-				response.push(wlanstatus);
-				wlandefer.resolve()
-			} else  {
-                wlandefer.resolve()
-			}
-		} else {
-            wlandefer.resolve()
-		}
+    defers.push(wlandefer);
 
-	});
+    var wlanip = self.getIPV4Address('wlan0');
+    if (wlanip != undefined) {
+    	if (wlanip == '192.168.211.1') {
+            var wlanstatus = {type: "Wireless", ssid: 'Hotspot', signal: 5, ip:'192.168.211.1', online: oll}
+        } else {
+            var wlanstatus = {type: "Wireless", ssid: ssid, signal: wirelessquality,ip: wlanip, status: "connected", speed: wirelessspeed, online: oll}
+        }
+        response.push(wlanstatus);
+        wlandefer.resolve();
+	} else {
+        wlandefer.resolve();
+	}
+
     libQ.all(defers)
         .then(function () {
             defer.resolve(response)
@@ -979,26 +967,20 @@ ControllerNetwork.prototype.isWPA = function (data) {
 ControllerNetwork.prototype.getWirelessInfo = function () {
     var self = this;
     var defer = libQ.defer();
-    var response = {"connected":false, "ssid":""}
+    var response = {"connected":false, "ssid":""};
 
-    ifconfig.status('wlan0', function (err, status) {
-        if (status != undefined) {
-            if (status.ipv4_address != undefined) {
-                if (status.ipv4_address != '192.168.211.1') {
-                    response.connected = true
-					response.ssid = execSync('/usr/bin/sudo /sbin/iwconfig wlan0 | grep ESSID | cut -d\\" -f2', { encoding: 'utf8' });
-                } else {
+    var wlanip = self.getIPV4Address('wlan0');
+    if (wlanip != undefined) {
+    	if (wlanip != '192.168.211.1') {
+            response.connected = true
+            response.ssid = execSync('/usr/bin/sudo /sbin/iwconfig wlan0 | grep ESSID | cut -d\\" -f2', { encoding: 'utf8' });
+		} else {
 
-                }
-                defer.resolve(response)
-            } else  {
-                defer.resolve(response)
-            }
+		}
+        defer.resolve(response);
         } else {
-            defer.resolve(response)
-        }
-
-    });
+        defer.resolve(response);
+	}
 
     return defer.promise
 };
@@ -1006,22 +988,29 @@ ControllerNetwork.prototype.getWirelessInfo = function () {
 ControllerNetwork.prototype.getWiredInfo = function () {
     var self = this;
     var defer = libQ.defer();
-    var response = {"connected":false, "ip":""}
+    var response = {"connected":false, "ip":""};
 
-    ifconfig.status('eth0', function (err, status) {
-        if (status != undefined) {
-            if (status.ipv4_address != undefined) {
-                response.connected = true;
-				response.ip = status.ipv4_address;
-                defer.resolve(response)
-            } else  {
-                defer.resolve(response)
-            }
-        } else {
-            defer.resolve(response)
-        }
-
-    });
+    var ip = self.getIPV4Address('eth0');
+    if (ip != undefined) {
+        response.connected = true;
+        response.ip = ip;
+        defer.resolve(response)
+	} else {
+        defer.resolve(response)
+	}
 
     return defer.promise
+};
+
+ControllerNetwork.prototype.getIPV4Address = function (iface) {
+    var self = this;
+
+    if (iface != undefined) {
+		try {
+            var ipv4 = execSync("ip addr show " + iface + " | grep \"inet\" | awk '{print $2}' | awk -F \"/\" '{print $1}' | sed '2d' | tr -d '\n'", { encoding: 'utf8' });
+		} catch(e) {
+            var ipv4 = undefined;
+		}
+    	return ipv4
+	}
 };
